@@ -374,6 +374,57 @@ public:
     bar.finalize();
   }
 
+ void benchmark_inference(size_t num_samples, vec3i dims) const
+  {
+   std::cout << "[benchmark] starting inference benchmark for " << num_samples << " samples" << std::endl;
+
+  // Use same batch approach as save_inference_volume
+  const auto rdims = 1.f / dims;
+  const auto batch = vec3i(dims.x, dims.y, 1);  // One slice at a time
+  const auto count = util::next_multiple<size_t>(batch.long_product(), 256);
+  
+  const size_t num_batches = (num_samples + count - 1) / count;
+  const size_t total_samples = num_batches * count;
+
+  // Allocate GPU memory for input coordinates (3D) and output values
+  GPUMemory<vec3f> batch_input(count);
+  GPUMemory<float> batch_output(count);
+
+  // Generate coordinates for one slice (reuse for all batches)
+  util::linear_kernel(generate_coords, 0, 0, (uint32_t)count, 
+                      vec3i(0, 0, 0), batch, rdims, 
+                      (float*)batch_input.data());
+
+  // Synchronize before timing
+  CUDA_CHECK(cudaDeviceSynchronize());
+
+  // Start timing
+  auto start = std::chrono::high_resolution_clock::now();
+
+  // Run inference for all batches
+  for (size_t batch = 0; batch < num_batches; ++batch) {
+    GPUColumnMatrix x((float*)batch_input.data(), 3, (uint32_t)count);
+    GPUColumnMatrix y((float*)batch_output.data(), 1, (uint32_t)count);
+    
+    m_neural->infer(x, y, 0);
+  }
+
+  // Synchronize and stop timing
+  CUDA_CHECK(cudaDeviceSynchronize());
+  auto end = std::chrono::high_resolution_clock::now();
+
+  // Calculate statistics
+  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+  double seconds = duration.count() / 1000.0;
+  double samples_per_second = total_samples / seconds;
+  double ms_per_sample = (seconds * 1000.0) / total_samples;
+
+  std::cout << "[benchmark] completed " << total_samples << " samples in " 
+            << seconds << " seconds" << std::endl;
+  std::cout << "[benchmark] throughput: " << samples_per_second << " samples/sec" << std::endl;
+  std::cout << "[benchmark] latency: " << ms_per_sample << " ms/sample" << std::endl;
+  }
+
   void save_inference_volume(std::string filename, vec3i dims) const // save the actual decoded volume
   {
     const auto rdims = 1.f / dims;
@@ -452,6 +503,82 @@ public:
     logging() << "[saving volume] min=" << value_min << " max=" << value_max << std::endl;
   }
 
+  void save_residual_volume(std::string filename, vec3i dims) const
+  {
+    if (!m_source) {
+      std::cerr << "[error]: missing a reference volume." << std::endl; return;
+    }
+
+    const auto rdims = 1.f / dims;
+    const auto batch = vec3i(dims.x, dims.y, 1);
+    const auto count = util::next_multiple<size_t>(batch.long_product(), 256);
+
+    GPUMemory<vec3f> slice_input(count);
+    GPUMemory<float> slice_inference(count);
+    GPUMemory<float> slice_reference(count);
+    GPUMemory<float> slice_residual(count);
+    std::vector<float> values(count);
+
+    float value_max = -float_large;
+    float value_min = +float_large;
+
+    ProgressBar bar("[saving residual volume]");
+
+    // Save raw data file
+    std::string raw_filename = filename + ".raw";
+    std::ofstream ofile(raw_filename, std::ios::out | std::ios::binary);
+    if (!ofile) throw std::runtime_error("Cannot open file: " + raw_filename);
+
+    for (int z = 0; z < dims.z; ++z) {
+      util::linear_kernel(generate_coords, 0, 0, (uint32_t)count, vec3i(0,0,z), batch, rdims, (float*)slice_input.data());
+      
+      // Get inference values
+      GPUColumnMatrix x((float*)slice_input.data(), 3, (uint32_t)count);
+      GPUColumnMatrix y((float*)slice_inference.data(), 1, (uint32_t)count);
+      m_neural->infer(x, y, 0);
+      
+      // Get reference values
+      m_source->sampler->take_samples_grid(slice_input.data(), slice_reference.data(), vec3i(0,0,z), batch, rdims, nullptr);
+      
+      // Compute residual (reference - inference)
+      util::parallel_for_gpu(0, 0, count, 
+      [ref=slice_reference.data(), inf=slice_inference.data(), res=slice_residual.data()] __device__ (size_t i) {
+        res[i] = ref[i] - inf[i];
+      });
+
+      slice_residual.copy_to_host(values);
+      ofile.write((char *)values.data(), sizeof(float) * count);
+
+      parallel_minmax_gpu(slice_residual.data(), count, value_min, value_max);
+
+      bar.update((float)z / dims.z);
+    }
+    bar.finalize();
+
+    ofile.close();
+    if(!ofile.good()) throw std::runtime_error("Error occurred at writing " + raw_filename);
+
+    // Write NHDR header file
+    std::string nhdr_filename = filename + ".nhdr";
+    std::ofstream nhdr(nhdr_filename);
+    if (!nhdr) throw std::runtime_error("Cannot open file: " + nhdr_filename);
+
+    nhdr << "NRRD0004\n";
+    nhdr << "type: float\n";
+    nhdr << "dimension: 3\n";
+    nhdr << "sizes: " << dims.x << " " << dims.y << " " << dims.z << "\n";
+    nhdr << "encoding: raw\n";
+    nhdr << "endian: little\n";
+    nhdr << "datafile: " << raw_filename << "\n";
+
+    nhdr.close();
+    if(!nhdr.good()) throw std::runtime_error("Error occurred at writing " + nhdr_filename);
+
+    logging() << "[saving residual volume] saved the residual volume to: " << raw_filename << std::endl;
+    logging() << "[saving residual volume] saved header to: " << nhdr_filename << std::endl;
+    logging() << "[saving residual volume] min=" << value_min << " max=" << value_max << std::endl;
+  }
+
   float get_mse(vec3i dims, bool quiet) const
   {
     if (!m_source) {
@@ -460,7 +587,7 @@ public:
 
     const vec3f rdims = 1.f / dims;
 
-    const vec3i batch = min(vec3i(4096,16,16),dims);
+    const vec3i batch = min(vec3i(4096, 16, 16),dims);
     const auto N = util::next_multiple<size_t>(batch.long_product(), 256);
 
     GPUMemory<vec3f> coords(N);
@@ -834,6 +961,12 @@ NeuralVolume::decode_volume(float* output, vec3i resolution) const
 }
 
 void
+NeuralVolume::benchmark_inference(size_t num_samples, vec3i resolution) const
+{
+  pimpl->benchmark_inference(num_samples, resolution);
+}
+
+void
 NeuralVolume::save_inference_volume(std::string filename, vec3i resolution) const
 {
   pimpl->save_inference_volume(filename, resolution);
@@ -843,6 +976,12 @@ void
 NeuralVolume::save_reference_volume(std::string filename, vec3i resolution) const
 {
   pimpl->save_reference_volume(filename, resolution);
+}
+
+void
+NeuralVolume::save_residual_volume(std::string filename, vec3i resolution) const
+{
+  pimpl->save_residual_volume(filename, resolution);
 }
 
 void 

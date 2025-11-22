@@ -252,6 +252,13 @@ void vnrNeuralVolumeDecode(vnrVolume self, float* output)
   nv->neural.decode_volume(output, nv->neural.get_data_dims());
 }
 
+void vnrNeuralVolumeBenchmarkInference(vnrVolume self, size_t num_samples)
+{
+  std::cout << "TEST2" << std::endl;
+  auto nv = castNeuralVolume(self);
+  nv->neural.benchmark_inference(num_samples, nv->neural.get_data_dims());
+}
+
 void vnrNeuralVolumeDecodeInference(vnrVolume self, std::string filename)
 {
   auto nv = castNeuralVolume(self);
@@ -262,6 +269,12 @@ void vnrNeuralVolumeDecodeReference(vnrVolume self, std::string filename)
 {
   auto nv = castNeuralVolume(self);
   nv->neural.save_reference_volume(filename, nv->neural.get_data_dims());
+}
+
+void vnrNeuralVolumeDecodeResidual(vnrVolume self, std::string filename)
+{
+  auto nv = castNeuralVolume(self);
+  nv->neural.save_residual_volume(filename, nv->neural.get_data_dims());
 }
 
 void vnrNeuralVolumeSerializeParams(vnrVolume self, std::string filename)

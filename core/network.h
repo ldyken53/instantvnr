@@ -83,8 +83,10 @@ public:
   void* get_network() const; // access the tcnn network in terms of raw pointer
 
   void decode_volume(float* output, vec3i resolution) const;
+  void benchmark_inference(size_t num_samples, vec3i dims) const;
   void save_reference_volume(std::string filename, vec3i resolution) const;
   void save_inference_volume(std::string filename, vec3i resolution) const;
+  void save_residual_volume(std::string filename, vec3i resolution) const;
 
   void save_params(std::string filename) const;
   void save_params_to_json(json& params) const;

@@ -139,8 +139,10 @@ void vnrNeuralVolumeTrain(vnrVolume, int steps, bool fast_mode, bool verbose = f
 void vnrNeuralVolumeDecodeProgressive(vnrVolume);
 
 void vnrNeuralVolumeDecode(vnrVolume, float* output);
+void vnrNeuralVolumeBenchmarkInference(vnrVolume self, size_t num_samples);
 void vnrNeuralVolumeDecodeInference(vnrVolume, std::string filename);
 void vnrNeuralVolumeDecodeReference(vnrVolume, std::string filename);
+void vnrNeuralVolumeDecodeResidual(vnrVolume, std::string filename);
 
 void vnrNeuralVolumeSerializeParams(vnrVolume, std::string filename);
 void vnrNeuralVolumeSerializeParams(vnrVolume, vnrJson& params);
