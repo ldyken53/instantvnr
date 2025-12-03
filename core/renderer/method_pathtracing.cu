@@ -173,6 +173,7 @@ inline __device__ uint32_t save(const PathTracingData& params, const SampleStrea
 {
   const auto ridx = new_ray_index(params);
   save(params, ridx, payload, ray);
+  return 0;
 }
 
 /* volume decoding version */ void

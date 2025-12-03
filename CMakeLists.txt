@@ -58,9 +58,10 @@ if(OVR_BUILD_MODULE_NNVOLUME)
   #
   ################
   set(MACROCELL_SIZE_MIP 4)
-  set(ENABLE_IN_SHADER ON)
-  set(ENABLE_OUT_OF_CORE ON)
-  set(ENABLE_OPENGL ON)
+  set(ENABLE_IN_SHADER OFF)
+  set(ENABLE_OUT_OF_CORE OFF)
+  set(ENABLE_OPENGL OFF)
+  set(ENABLE_FVSRN ON)
 
   add_subdirectory(core)
   add_subdirectory(device)

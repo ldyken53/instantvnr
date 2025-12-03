@@ -57,6 +57,16 @@ else()
 endif()
 
 # ======================================================================== #
+# Add the diff-gaussian-rasterization subdirectory
+# ======================================================================== #
+# This makes the CudaRasterizer target available and handles all dependencies
+# Only add if the target doesn't already exist
+if(NOT TARGET CudaRasterizer)
+  add_subdirectory(../../diff-gaussian-rasterization ${CMAKE_CURRENT_BINARY_DIR}/diff-gaussian-rasterization)
+endif()
+set_target_properties(CudaRasterizer PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+# ======================================================================== #
 # renderer core
 # ======================================================================== #
 
@@ -95,6 +105,13 @@ add_library(${target} SHARED
   ../api.h
 )
 
+target_include_directories(${target} PRIVATE 
+  ../../diff-gaussian-rasterization
+  ../../diff-gaussian-rasterization/cuda_rasterizer
+  ../../diff-gaussian-rasterization/third_party/cuBQL
+  ../../diff-gaussian-rasterization/third_party/glm
+)
+
 if(ENABLE_IN_SHADER)
   target_sources(${target} PRIVATE
     networks/tcnn_device_encoder.cu
@@ -111,10 +128,10 @@ endif()
 
 if(ENABLE_FVSRN)
   target_sources(${target} PRIVATE
-    ../../fvsrn/volume_interpolation_network.cu
+    ../../diff-gaussian-rasterization/gaussian_model.h
     networks/fvsrn_network.cu
   )
-  target_compile_definitions(${target} PRIVATE ENABLE_FVSRN=1)
+  target_compile_definitions(${target} PUBLIC ENABLE_FVSRN=1)
 endif()
 
 set_target_properties(${target} 
@@ -136,8 +153,9 @@ target_compile_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcudafe="--
 
 target_link_libraries(${target} PRIVATE TBB::tbb curand)
 
+# Link to the CudaRasterizer target which provides all the necessary dependencies
 target_link_libraries(${target} PUBLIC # intentionally keep these library public
-  gdt util tfnmodule tiny-cuda-nn
+  gdt util tfnmodule tiny-cuda-nn CudaRasterizer
 )
 
 if(TARGET openvkl::openvkl AND TARGET openvkl::testing)

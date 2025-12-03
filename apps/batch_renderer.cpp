@@ -98,6 +98,10 @@ public:
   args::ValueFlag<std::string> m_expname;
   std::string expname() { return (m_expname) ? args::get(m_expname) : "output"; }
 
+  args::ValueFlag<std::string> m_ply_file;
+  bool has_ply_file() { return m_ply_file; }
+  std::string ply_file() { return args::get(m_ply_file); }
+
   std::string render_mode_msg() {
     std::string msg;
     for (int i = 0; i < Items_Count(render_modes); ++i) {
@@ -126,6 +130,7 @@ public:
     , m_density_scale (parser,       "float",    "path tracing density scale",    {"density-scale"})
     , m_rendering_mode(parser, "int", render_mode_msg(), {"rendering-mode"})
     , m_expname(parser, "std::string", "experiment name", {"exp"})
+    , m_ply_file(parser, "filename", "PLY file to use with FVSRN model", {"ply-file"})
   {
     exec(parser, argc, argv);
   }
@@ -167,11 +172,19 @@ main(int ac, char** av)
     vnrVolume volume;
 
     if (args.has_simple_volume()) {
+      std::cout << "first" << std::endl;
       volume = vnrCreateSimpleVolume(args.volume(), "GPU", false);
     }
     else {
       vnrJson params;
       vnrLoadJsonBinary(params, args.volume());
+      
+      // Set FVSRN parameters if PLY file is provided
+      if (args.has_ply_file()) {
+        params["model"]["fvsrn"] = 1;
+        params["model"]["ply"] = args.ply_file();
+      }
+      
       volume = vnrCreateNeuralVolume(params);
     }
 

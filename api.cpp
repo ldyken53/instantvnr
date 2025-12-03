@@ -230,7 +230,9 @@ vnrVolume vnrCreateNeuralVolume(const json& params, size_t batchsize)
     throw std::runtime_error("expecting a model config with volume dims tag");
   }
   auto ret = vnrCreateNeuralVolume(params["model"], dims, batchsize);
-  vnrNeuralVolumeSetParams(ret, params);
+  if (!params["model"].contains("fvsrn")) {
+    vnrNeuralVolumeSetParams(ret, params);
+  }
   return ret;
 }
 

@@ -742,7 +742,6 @@ public:
       m_dims = _dims; // '_dims' should not be used
       m_transform = affine3f::translate(vec3f(m_dims) / vec3f(-2.f)) * affine3f::scale(vec3f(m_dims));
     }
-
     if (config.contains("fvsrn")) {
 #ifdef ENABLE_FVSRN
       m_neural = std::make_shared<FvsrnNetwork>();
