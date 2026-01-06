@@ -55,9 +55,6 @@ void FvsrnNetwork::infer(const GPUMatrixDynamic<float>& coord, GPUMatrixDynamic<
   int num_samples = coord.n();
   
   // Synchronize the stream before any GPU operations (since infer doesn't support streams)
-  if (stream != 0) {
-    (cudaStreamSynchronize(stream));
-  }
   float* d_out_weights;
   cudaMalloc((void**)&d_out_weights, num_samples * sizeof(float));
   

@@ -256,7 +256,6 @@ void vnrNeuralVolumeDecode(vnrVolume self, float* output)
 
 void vnrNeuralVolumeBenchmarkInference(vnrVolume self, size_t num_samples)
 {
-  std::cout << "TEST2" << std::endl;
   auto nv = castNeuralVolume(self);
   nv->neural.benchmark_inference(num_samples, nv->neural.get_data_dims());
 }

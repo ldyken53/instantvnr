@@ -414,14 +414,14 @@ public:
   auto end = std::chrono::high_resolution_clock::now();
 
   // Calculate statistics
-  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-  double seconds = duration.count() / 1000.0;
-  double samples_per_second = total_samples / seconds;
-  double ms_per_sample = (seconds * 1000.0) / total_samples;
+  auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+  double mseconds = duration.count() * 1e-6;
+  double samples_per_msecond = total_samples / mseconds;
+  double ms_per_sample = mseconds / total_samples;
 
   std::cout << "[benchmark] completed " << total_samples << " samples in " 
-            << seconds << " seconds" << std::endl;
-  std::cout << "[benchmark] throughput: " << samples_per_second << " samples/sec" << std::endl;
+            << mseconds << " milliseconds" << std::endl;
+  std::cout << "[benchmark] throughput: " << samples_per_msecond << " samples/ms" << std::endl;
   std::cout << "[benchmark] latency: " << ms_per_sample << " ms/sample" << std::endl;
   }
 

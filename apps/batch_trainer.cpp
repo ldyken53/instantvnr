@@ -224,7 +224,7 @@ restart:
   vnrJson output;
   vnrNeuralVolumeSerializeParams(neural_volume, output);
   vnrSaveJsonBinary(output, "params.json");
-  vnrNeuralVolumeDecodeResidual(neural_volume, "testrm");
+  // vnrNeuralVolumeDecodeResidual(neural_volume, "testrm");
 
 
   simple_volume.reset();

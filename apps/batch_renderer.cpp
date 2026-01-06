@@ -249,6 +249,8 @@ main(int ac, char** av)
     std::cout << "\t        " << at   << std::endl;
     std::cout << "\t        " << up   << std::endl;
 
+    vnrNeuralVolumeBenchmarkInference(volume, 1048576);
+
     // vnrFreeTemporaryGPUMemory();
     vnrMemoryQueryPrint("[vnr]"); // Optional
 
