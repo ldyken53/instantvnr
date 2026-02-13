@@ -59,12 +59,22 @@ endif()
 # ======================================================================== #
 # Add the diff-gaussian-rasterization subdirectory
 # ======================================================================== #
-# This makes the CudaRasterizer target available and handles all dependencies
-# Only add if the target doesn't already exist
-if(NOT TARGET CudaRasterizer)
-  add_subdirectory(../../diff-gaussian-rasterization ${CMAKE_CURRENT_BINARY_DIR}/diff-gaussian-rasterization)
+set(DIFF_GAUSSIAN_RASTERIZATION_DIR ${CMAKE_CURRENT_LIST_DIR}/../../diff-gaussian-rasterization)
+set(HAS_DIFF_GAUSSIAN_RASTERIZATION FALSE)
+if(EXISTS ${DIFF_GAUSSIAN_RASTERIZATION_DIR}/CMakeLists.txt)
+  set(HAS_DIFF_GAUSSIAN_RASTERIZATION TRUE)
 endif()
-set_target_properties(CudaRasterizer PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+# This makes the CudaRasterizer target available and handles all dependencies.
+# Skip it when diff-gaussian-rasterization is not checked out.
+if(HAS_DIFF_GAUSSIAN_RASTERIZATION)
+  if(NOT TARGET CudaRasterizer)
+    add_subdirectory(${DIFF_GAUSSIAN_RASTERIZATION_DIR} ${CMAKE_CURRENT_BINARY_DIR}/diff-gaussian-rasterization)
+  endif()
+  set_target_properties(CudaRasterizer PROPERTIES POSITION_INDEPENDENT_CODE ON)
+else()
+  message(STATUS "diff-gaussian-rasterization not found; skipping CudaRasterizer target.")
+endif()
 
 # ======================================================================== #
 # renderer core
@@ -105,12 +115,14 @@ add_library(${target} SHARED
   ../api.h
 )
 
-target_include_directories(${target} PRIVATE 
-  ../../diff-gaussian-rasterization
-  ../../diff-gaussian-rasterization/cuda_rasterizer
-  ../../diff-gaussian-rasterization/third_party/cuBQL
-  ../../diff-gaussian-rasterization/third_party/glm
-)
+if(HAS_DIFF_GAUSSIAN_RASTERIZATION)
+  target_include_directories(${target} PRIVATE
+    ../../diff-gaussian-rasterization
+    ../../diff-gaussian-rasterization/cuda_rasterizer
+    ../../diff-gaussian-rasterization/third_party/cuBQL
+    ../../diff-gaussian-rasterization/third_party/glm
+  )
+endif()
 
 if(ENABLE_IN_SHADER)
   target_sources(${target} PRIVATE
@@ -126,12 +138,14 @@ if(ENABLE_OUT_OF_CORE)
   target_link_libraries     (${target} PRIVATE $<$<PLATFORM_ID:Linux>:aio>)
 endif()
 
-if(ENABLE_FVSRN)
+if(ENABLE_FVSRN AND HAS_DIFF_GAUSSIAN_RASTERIZATION)
   target_sources(${target} PRIVATE
     ../../diff-gaussian-rasterization/gaussian_model.h
     networks/fvsrn_network.cu
   )
   target_compile_definitions(${target} PUBLIC ENABLE_FVSRN=1)
+elseif(ENABLE_FVSRN)
+  message(STATUS "ENABLE_FVSRN requested but diff-gaussian-rasterization is missing; disabling FVSRN sources.")
 endif()
 
 set_target_properties(${target} 
@@ -155,8 +169,12 @@ target_link_libraries(${target} PRIVATE TBB::tbb curand)
 
 # Link to the CudaRasterizer target which provides all the necessary dependencies
 target_link_libraries(${target} PUBLIC # intentionally keep these library public
-  gdt util tfnmodule tiny-cuda-nn CudaRasterizer
+  gdt util tfnmodule tiny-cuda-nn
 )
+
+if(TARGET CudaRasterizer)
+  target_link_libraries(${target} PUBLIC CudaRasterizer) # intentionally keep this library public
+endif()
 
 if(TARGET openvkl::openvkl AND TARGET openvkl::testing)
   target_compile_definitions(${target} PRIVATE ENABLE_OPENVKL=1)
