@@ -587,7 +587,12 @@ public:
 
     const vec3f rdims = 1.f / dims;
 
-    const vec3i batch = min(vec3i(4096, 16, 16),dims);
+    const int by = std::max(1, std::min(dims.y, 16));
+    const int bz = std::max(1, std::min(dims.z, 16));
+    const size_t yz = (size_t)by * (size_t)bz;
+    const size_t eval_batch_size = std::max<size_t>(m_batch_size, 1);
+    const int bx = std::max(1, std::min(dims.x, (int)std::max<size_t>(1, eval_batch_size / yz)));
+    const vec3i batch = vec3i(bx, by, bz);
     const auto N = util::next_multiple<size_t>(batch.long_product(), 256);
 
     GPUMemory<vec3f> coords(N);
@@ -668,7 +673,12 @@ public:
       ? (float)NP / (NP - 1) // sample covariance
       : 1.f; // population covariance to match Wang et. al. 2004
 
-    const vec3i batch = min(vec3i(4096,16,16),dims);
+    const int by = std::max(1, std::min(dims.y, 16));
+    const int bz = std::max(1, std::min(dims.z, 16));
+    const size_t yz = (size_t)by * (size_t)bz;
+    const size_t eval_batch_size = std::max<size_t>(m_batch_size, 1);
+    const int bx = std::max(1, std::min(dims.x, (int)std::max<size_t>(1, eval_batch_size / yz)));
+    const vec3i batch = vec3i(bx, by, bz);
     const auto batch_count = util::next_multiple<size_t>(batch.long_product(), 256);
 
     const vec3i batch_grid = batch + win_size - 1;
@@ -707,9 +717,6 @@ public:
       util::trilinear_kernel(compute_ssim<win_size>, 0, 0, block.x, block.y, block.z, 
                        grid_reference.data(), grid_inference.data(), block_grid,
                        data_range, cov_norm, K1, K2, output);
-      std::vector<float> S(block.long_product());
-      grid_input.copy_to_host(S.data(), block.long_product());
-
       // compute total ssim
       ssim_sum += parallel_sum_gpu(output, block_count);
     }

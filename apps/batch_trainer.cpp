@@ -145,30 +145,6 @@ main(int ac, char** av)
 
   vnrJson model = vnrCreateJsonText(args.config());
 
-  // VolumeDesc_Structured desc;
-  // {
-  //   desc.shape.dimx = 1152;
-  //   desc.shape.dimy = 320;
-  //   desc.shape.dimz = 853;
-  //   desc.shape.dtype = "float32";
-  //   desc.offset = 0;
-  //   desc.filename = "data/datasets/1atm.heatrelease.3x.1152.320.853f32.bin";
-  //   desc.is_big_endian = false;
-  //   desc.shape.min = -3290981376;
-  //   desc.shape.max = 0;
-  // }
-  //
-  // const size_t size = (size_t)desc.shape.dimx*(size_t)desc.shape.dimy*(size_t)desc.shape.dimz;
-  // std::shared_ptr<char[]> buffer(new char[size * sizeof(float)]);
-  // desc.dst = (void*)buffer.get();
-  // dvnrLoadData(desc);
-  //
-  // vnrVolume simple_volume = vnrCreateSimpleVolume(desc.dst, 
-  //   vnr::vec3i(desc.shape.dimx, desc.shape.dimy, desc.shape.dimz), "float32", 
-  //   vnr::range1f(desc.shape.min, desc.shape.max),
-  //   args.training_mode()
-  // );
-
   vnrVolume simple_volume = vnrCreateSimpleVolume(args.volume(), args.training_mode());
   vnrVolume neural_volume;
 
@@ -181,13 +157,11 @@ restart:
   }
 
   logger.initialize({"step", "loss"}, args.report_filename());
+  timer.start();
 
   for (int i = 0; i < steps; i += 10) {
-    timer.start();
 
     vnrNeuralVolumeTrain(neural_volume, 10, true);
-
-    timer.stop();
   
     logger.log_entry<double>({
       (double)vnrNeuralVolumeGetTrainingStep(neural_volume),
@@ -205,7 +179,7 @@ restart:
       goto restart;
     }
   }
-
+  timer.stop();
   if (!args.quiet) bar.finalize();
 
   const auto totaltime = timer.milliseconds();
@@ -224,13 +198,10 @@ restart:
   vnrJson output;
   vnrNeuralVolumeSerializeParams(neural_volume, output);
   vnrSaveJsonBinary(output, "params.json");
-  // vnrNeuralVolumeDecodeResidual(neural_volume, "testrm");
-
 
   simple_volume.reset();
   neural_volume.reset();
 
-  // vnrFreeTemporaryGPUMemory();
   vnrMemoryQueryPrint("[vnr]"); // Optional
 
   return 0;
